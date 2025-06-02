@@ -1,0 +1,7 @@
+# todo: 该文件用于配置开发环境的多层级嵌套的环境变量
+db:
+  mysql1:
+    name: mysql-dev1
+
+  mysql2:
+    name: mysql-dev2

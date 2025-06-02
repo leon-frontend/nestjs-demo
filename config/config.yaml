@@ -1,0 +1,10 @@
+# todo: 该文件用于配置公共的多层级嵌套的环境变量
+db:
+  mysql1:
+    host: 127.0.0.1
+    name: mysql-common1
+    port: 3306
+
+  mysql2:
+    host: 127.0.0.1
+    port: 3306

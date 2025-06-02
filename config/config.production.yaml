@@ -1,0 +1,7 @@
+# todo: 该文件用于配置生产环境的多层级嵌套的环境变量
+db:
+  mysql1:
+    name: mysql-prod1
+
+  mysql2:
+    name: mysql-prod2
