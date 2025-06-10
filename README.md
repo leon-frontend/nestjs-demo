@@ -95,7 +95,7 @@ export default (): Record<string, any> => {
 
 - **理解**：`config` 库核心思想是将应用的配置信息从代码中分离出来，允许不同的配置根据运行的环境（如开发、生产、测试等）进行管理和加载。
 - **特点**：`config` 库支持配置项的**层级结构**，可以将多个配置项组织成一个嵌套对象。
-- **优点**：可以**自动读取**公共配置并**合并**特定环境的配置。当配置发生冲突时，特定环境的配置会**覆盖**公共配置。
+- **优点**：可以**自动读取**公共配置并**合并**特定环境的配置。当配置发生冲突时，特定环境的配置会**覆盖**公共配置。**不需要手动进行配置**就能读取环境变量，非常方便。
 - **使用场景**：它通常用于中大型项目，尤其是当应用有多个配置项并且需要在不同环境中灵活配置时。
 
 ```ts
@@ -116,7 +116,7 @@ project/
 
 // 使用 config 库来加载和访问这些配置项
 const config = require('config'); // 导入 config 库
-const dbUser = config.get('db.credentials.user');
+const dbUser = config.get('db.credentials.user'); // 可以在任何地方使用这个方法
 console.log(dbUser); // 输出：admin
 ```
 
@@ -139,3 +139,61 @@ ConfigModule.forRoot({
 }),
 ```
 
+#  03. TypeORM 库
+
+## 3.1 必备依赖包
+
+- **@nestjs/typeorm 库**：NestJS 官方提供的 TypeORM **集成**模块，用于搭建 NestJs 和 TypeORM 之间的桥梁。它使用 TypeORM 库来操作数据库，但是它本身**并不包含 TypeORM 的代码**，所以必须显式安装 `typeorm` 才能正常运行 `@nestjs/typeorm` 提供的功能。该库能让你在 NestJS 中使用依赖注入（DI）方式来配置和操作数据库。
+- **typeorm 库**：TypeORM 是一个流行的 TypeScript ORM（对象关系映射）库。
+
+- **mysql2 库**：MySQL 的 Node.js 客户端库（驱动），它是**真正操作数据库**的库。与原始的 `mysql` 包相比，`mysql2` 更快，兼容性更好，支持 Promise 和 async/await。TypeORM 在底层是通过它来实际发起数据库连接和执行查询的。
+
+```bash
+pnpm i --save @nestjs/typeorm typeorm mysql2 # 安装依赖包
+```
+
+## 3.2 使用 docker 运行 MySQL
+
+```yaml
+# ---------------------- docker-compose.yml 配置文件 --------------------
+services:
+  db:
+    image: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: example # 密码
+      MYSQL_DATABASE: testdb # 数据库名，用于创建新数据库
+    ports:
+      - "3307:3306"  # 映射到宿主机的3307端口（3306 端口被占用）
+
+  # mysql 的管理工具：通过 localhost:8080 网站访问 mysql 图像化界面
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+
+# 运行 docker 中的 mysql 数据库
+docker-compose up -d
+```
+
+## 3.3 连接数据库
+
+``` ts
+// 1. 数据写死配置方式 - forRoot 方法
+TypeOrmModule.forRoot({
+  type: 'mysql',
+  host: 'localhost',
+  port: 3307, // 端口号，查看 docker-compose.yml 配置文件
+  username: 'root',
+  password: 'example',
+  database: 'testdb', // 指定要连接的数据库名称，mysql 中必须需要有这个数据库
+  entities: [],
+  synchronize: process.env.NODE_ENV === 'development', // 同步本地实体与数据库中的表结构，一般会在初始化时使用。注意，仅在开发环境使用。
+  logging: ['error'],
+}),
+    
+// 2. 使用 configService 读取环境变量来配置数据库，可以使用泛型来限制配置类型(也可以配合 Joi 使用) - forRootAsync 方法
+```
+
+## 3.4 使用 ORM 创建数据库表

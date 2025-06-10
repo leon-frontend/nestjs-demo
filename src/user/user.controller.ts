@@ -17,7 +17,7 @@ export class UserController {
   getUsers(): any {
     // console.log('DB: ', this.configService.get(configEnum.DB)); // 获取配置文件中的环境变量
     // console.log('DB_URL: ', this.configService.get('DB_URL')); // 获取 .env 公共配置文件中的公共环境变量
-    console.log('DB_PORT: ', this.configService.get('DB_PORT')); // 获取 .env 公共配置文件中的公共环境变量
+    console.log('user.controller DB_PORT: ', this.configService.get('DB_PORT')); // 获取 .env 公共配置文件中的公共环境变量
     // console.log('YAML_DB: ', this.configService.get('db'));
 
     return this.userService.getUsers();

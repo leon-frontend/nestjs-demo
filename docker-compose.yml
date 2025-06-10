@@ -6,7 +6,14 @@ services:
     image: mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: example
-    # (this is just an example, not intended to be a production configuration)
+      MYSQL_ROOT_PASSWORD: example # 密码
+      MYSQL_DATABASE: testdb # 数据库名
+    ports:
+      - "3307:3306"  # 映射到宿主机的3307端口（3306 端口被占用）
 
-  # mysql 的管理工具，比如 navicat
+  # mysql 的管理工具：通过 localhost:8080 网站访问 mysql 图像化界面
+  adminer:
+    image: adminer
+    restart: always
+    ports:  
+      - 8080:8080
