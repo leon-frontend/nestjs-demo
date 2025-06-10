@@ -42,7 +42,8 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 })
 ```
 
-- `ConfigModule.forRoot({ load：[xxx] })`：load 配置项可以用于加载自定义的配置文件。`.env` 文件在处理多层级的环境变量时会出现**变量名过长**的问题，比如 **`db_mysql_port`**。因此，可以使用 load 配置项读取 `yaml` 自定义文件，该类型文件主要处理**多层嵌套的环境变量**。
+- `ConfigModule.forRoot({ load：[xxx] })`：load 配置项可以用于加载自定义的配置文件。`.env` 文件在处理多层级的环境变量时会出现**变量名过长**的问题，比如 `db_mysql_port=xxx`。因此，可以使用 load 配置项读取 `yaml` 自定义文件，该类型文件主要处理**多层嵌套的环境变量**。
+- **注意**：需要使用 lodash 库中的 merge 方法手动**深度合并**公共配置和特定环境的配置。
 
 ```ts
 pnpm i js-yaml // 对 yaml 文件进行解析的库，会返回一个对象
@@ -69,9 +70,10 @@ export default () => { // 导出一个函数是为了在 app.module.ts 中的 lo
   return yaml.load(readFileSync(filePath, 'utf8'));  // 使用 yaml.laod 解析 yaml 文件，并返回一个对象
 };
 
-// ----------- 创建 config.development.yaml 文件和 config.production.yaml 文件 --------------
+// ---------------------- 分开开发环境和生产环境的变量 ----------------------
 pnpm i lodash // 使用 lodash 中的 merge 方法实现深度合并
-pnpm i --save-dev @types/lodash 
+pnpm i --save-dev @types/lodash
+// 创建 config.development.yaml 文件和 config.production.yaml 文件
 // 读取公共环境变量的 yaml 文件
 const YAML_COMMON_CONFIG = 'config.yaml';
 const commonPath = join(__dirname, '../config', YAML_COMMON_CONFIG);
@@ -93,6 +95,7 @@ export default (): Record<string, any> => {
 
 - **理解**：`config` 库核心思想是将应用的配置信息从代码中分离出来，允许不同的配置根据运行的环境（如开发、生产、测试等）进行管理和加载。
 - **特点**：`config` 库支持配置项的**层级结构**，可以将多个配置项组织成一个嵌套对象。
+- **优点**：可以**自动读取**公共配置并**合并**特定环境的配置。当配置发生冲突时，特定环境的配置会**覆盖**公共配置。
 - **使用场景**：它通常用于中大型项目，尤其是当应用有多个配置项并且需要在不同环境中灵活配置时。
 
 ```ts
@@ -112,10 +115,27 @@ project/
 }
 
 // 使用 config 库来加载和访问这些配置项
-const config = require('config'); 
+const config = require('config'); // 导入 config 库
 const dbUser = config.get('db.credentials.user');
 console.log(dbUser); // 输出：admin
 ```
 
+## 2.3 校验环境变量 & [Joi 库](https://joi.dev/api/?v=17.13.3)
 
+- **理解**：使用 Joi 库校验配置文件时，最好配合官方的 `@nestjs/config` 读取 `.env` 文件时使用。
+
+```ts
+ConfigModule.forRoot({
+  isGlobal: true, // ConfigModule 可以在所有模块中使用。注意，在其他模块中使用时需要导入 ConfigService。
+  envFilePath, // 读取开发环境或生产环境的 .env 文件
+  // 加载 .env 公共配置文件（与其他两个 .env 文件产生关联），并且使用 dotenv 库解析该文件(返回一个对象)。
+  load: [() => dotenv.config({ path: '.env' })], // load 方法用于加载自定义的配置文件。
+  // Joi 最好配合官方的 @nestjs/config 读取 .env 文件时使用。
+  validationSchema: Joi.object({
+    // DB_PORT: Joi.number().default(3306), // 设置环境变量的默认值
+    DB_PORT: Joi.number().valid(3306, 3308), // 校验环境变量的值，限制端口号的范围
+    NODE_ENV: Joi.string().valid('development', 'production', 'test'),
+  }),
+}),
+```
 
