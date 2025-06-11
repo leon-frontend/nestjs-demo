@@ -162,7 +162,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: example # 密码
-      MYSQL_DATABASE: testdb # 数据库名，用于创建新数据库
+      MYSQL_DATABASE: testdb # 创建数据库。只在首次创建 testdb 数据库时生效。
     ports:
       - "3307:3306"  # 映射到宿主机的3307端口（3306 端口被占用）
 
@@ -174,7 +174,7 @@ services:
       - 8080:8080
 
 # 运行 docker 中的 mysql 数据库
-docker-compose up -d
+docker-compose up -d # -d 表示在后台运行
 ```
 
 ## 3.3 连接数据库
@@ -189,11 +189,105 @@ TypeOrmModule.forRoot({
   password: 'example',
   database: 'testdb', // 指定要连接的数据库名称，mysql 中必须需要有这个数据库
   entities: [],
-  synchronize: process.env.NODE_ENV === 'development', // 同步本地实体与数据库中的表结构，一般会在初始化时使用。注意，仅在开发环境使用。
+  // 同步本地实体与数据库中的表结构，一般会在初始化时使用。注意，仅在开发环境使用。
+  synchronize: process.env.NODE_ENV === 'development', 
   logging: ['error'],
 }),
     
 // 2. 使用 configService 读取环境变量来配置数据库，可以使用泛型来限制配置类型(也可以配合 Joi 使用) - forRootAsync 方法
+TypeOrmModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (configService: ConfigService) => {
+    return {
+      type: configService.get<'mysql' | 'mariadb'>(configEnum.DB_TYPE),
+      host: configService.get<string>(configEnum.DB_HOST),
+      port: configService.get<number>(configEnum.DB_PORT),
+      username: configService.get<string>(configEnum.DB_USERNAME),
+      password: configService.get<string>(configEnum.DB_PASSWORD),
+      database: configService.get<string>(configEnum.DB_DATABASE), // 指定要连接的数据库名称，在 mysql 中必须存在。
+      entities: [User, Profile, Logs, Roles], // 实体类，对应数据库表
+   	  // 同步本地实体与数据库中的表结构，一般会在初始化时使用。注意，仅在开发环境使用。
+      synchronize: configService.get<string>(configEnum.DB_SYNC) === 'development', 
+      logging: ['error'],
+    };
+  },
+}),
 ```
 
-## 3.4 使用 ORM 创建数据库表
+## 3.4 创建数据库表 & 关联关系
+
+- **Reference**: [TypeORM 中文文档 - 关联关系](https://typeorm.bootcss.com/relations)
+
+![ERD](./images/ERD.png)
+
+### 3.4.1 一对一
+
+- **外键字段存放位置**：一个 User 拥有一个 Profile，外键字段存放于**”被拥有“**的表中。
+
+```ts
+// todo: 通过设计实体类来设计数据库表 - 创建一对一的关联关系
+@Entity()
+export class Profile {
+  @PrimaryGeneratedColumn() // 主键（自增列）
+  id: number;
+
+  @Column()
+  gender: number;
+
+  // 建立一对一依赖关系
+  @OneToOne(() => User) // 返回依赖的实体类（数据表）。返回函数形式可以避免循环依赖问题，延迟加载实体类型
+  @JoinColumn() // 创建关联字段（外键字段）。默认通过 userId 字段名关联 user 表。
+  // @JoinColumn({ name: 'uid' }) // 可以使用 name 属性自定义关联字段名称。
+  user: User; // 通过 user 属性可以访问关联的 User 对象的所有数据
+}
+```
+
+### 3.4.2 一对多 & 多对一
+
+- **外键字段存放位置**：存放于”多“的一方。User 拥有多个 Logs，外键字段存放于**”被拥有“**的一方。
+
+```ts
+// --------------------- todo: User 表设置一对多的关联关系 ---------------------
+@Entity()
+export class User {
+  ... ...
+  // 一对多关系：一个用户拥有多个日志，会在"被拥有"的表中创建外键字段。
+  // 第二个参数解析：表示从 A 实体如何找到 B 实体中对应的关联属性。当我从 User 查找关联的 Logs 时，通过 Logs 实体中的 user 属性来建立反向连接
+  @OneToMany(() => Logs, (logs) => logs.user)
+  logs: Logs[]; // 数组类型，表示多个日志
+}
+
+// --------------------- todo: Logs 表设置多对一的关联关系 ---------------------
+@Entity()
+export class Logs {
+  ... ...
+  // 多对一关系：多个日志对应一个用户
+  @ManyToOne(() => User, (user) => user.logs)
+  @JoinColumn() // 指定关联字段，默认值为 userId。注意，在 Logs 表（"多"的一方）中需要创建外键字段。
+  user: User;
+}
+```
+
+### 3.4.3 多对多
+
+```ts
+// --------------------- todo: User 表设置多对多的关联关系 ---------------------
+@Entity()
+export class User {
+  ... ...
+  // 多对多关系：一个用户拥有多个角色，一个角色对应多个用户
+  @ManyToMany(() => Roles, (roles) => roles.users)
+  @JoinTable({ name: 'users_roles' }) // 建立多对多关联的中间表，表名命名为 user_roles
+  roles: Roles[];
+}
+
+// --------------------- todo: Roles 表设置多对多的关联关系 ---------------------
+@Entity()
+export class Roles {
+  ... ...
+  @ManyToMany(() => User, (user) => user.roles)
+  users: User[];
+}
+```
+

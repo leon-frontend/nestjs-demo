@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: example # 密码
-      MYSQL_DATABASE: testdb # 数据库名
+      MYSQL_DATABASE: testdb # 创建数据库。只在首次创建 testdb 数据库时生效。
     ports:
       - "3307:3306"  # 映射到宿主机的3307端口（3306 端口被占用）
 
