@@ -173,7 +173,7 @@ services:
     ports:
       - 8080:8080
 
-# 运行 docker 中的 mysql 数据库
+# 使用命令行运行 docker 中的 mysql 数据库
 docker-compose up -d # -d 表示在后台运行
 ```
 
@@ -207,7 +207,7 @@ TypeOrmModule.forRootAsync({
       password: configService.get<string>(configEnum.DB_PASSWORD),
       database: configService.get<string>(configEnum.DB_DATABASE), // 指定要连接的数据库名称，在 mysql 中必须存在。
       entities: [User, Profile, Logs, Roles], // 实体类，对应数据库表
-   	  // 同步本地实体与数据库中的表结构，一般会在初始化时使用。注意，仅在开发环境使用。
+      // 同步本地实体与数据库中的表结构，一般会在初始化时使用。注意，仅在开发环境使用。
       synchronize: configService.get<string>(configEnum.DB_SYNC) === 'development', 
       logging: ['error'],
     };
@@ -215,7 +215,7 @@ TypeOrmModule.forRootAsync({
 }),
 ```
 
-## 3.4 创建数据库表 & 关联关系
+## 3.4 实体类 -> 数据库表
 
 - **Reference**: [TypeORM 中文文档 - 关联关系](https://typeorm.bootcss.com/relations)
 
@@ -288,6 +288,51 @@ export class Roles {
   ... ...
   @ManyToMany(() => User, (user) => user.roles)
   users: User[];
+}
+```
+
+## 3.5 数据库表 -> 实体类
+
+- **Reference**: [使用 typeorm-model-generator 库](https://www.npmjs.com/package/typeorm-model-generator)   |   [B 站视频](https://www.bilibili.com/video/BV14fDGYUEip?spm_id_from=333.788.videopod.episodes&vd_source=53fdd342b8b1677425cdb446eb231b76&p=54)
+
+```ts
+pnpm i -D typeorm-model-generator // 仅安装开发依赖
+```
+
+## 3.6 数据库的 CURD
+
+```ts
+// --------------------- todo: 在 user.module.ts 文件中将实体注册到当前模块 ---------------------
+@Module({
+  // 将 User 实体注册到当前模块。然后，NestJS 会自动创建 UserRepository（用于操作 User 表的工具），可以在 Service 中通过依赖注入使用。
+  imports: [TypeOrmModule.forFeature([User])],
+  controllers: [UserController],
+  providers: [UserService],
+})
+export class UserModule {}
+
+// --------------------- todo: 在 user.service.ts 文件中使用 UserRepository ---------------------
+@Injectable()
+export class UserService {
+  constructor(
+    // 使用 @InjectRepository() 装饰器将 UsersRepository（用于操作 User 表的工具）注入到 UsersService 中
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
+
+  findAll() { return this.userRepository.find(); }   // 查询所有数据
+  find(username: string) { return this.userRepository.findOne({ where: { username } }); } // 根据条件进行查询
+  remove(id: number) { return this.userRepository.delete(id); } // 删除某个 User 数据
+    
+  // 创建新的 User 数据
+  create(user: User) {
+    const userTemp = this.userRepository.create(user);
+    return this.userRepository.save(userTemp);
+  }
+    
+  // 更新用户时只需要提供要修改的字段, Partial<User> 表示 User 对象的部分属性，即所有属性都变成可选的。
+  // update 方法需要传递查询的参数，以及更新后的 User 类型的对象
+  update(id: number, user: Partial<User>) { return this.userRepository.update(id, user); }
 }
 ```
 

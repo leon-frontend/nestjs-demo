@@ -13,7 +13,7 @@ import {
 @Entity()
 export class User {
   @PrimaryGeneratedColumn() // 主键（自增列）
-  id: number;
+  id?: number;
 
   @Column() // 列
   username: string;

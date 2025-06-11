@@ -1,22 +1,40 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { User } from './user.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class UserService {
-  // todo: 获取用户数据
-  getUsers() {
-    return {
-      code: 200,
-      msg: '获取用户数据成功',
-      data: [1, 2, 3],
-    };
+  constructor(
+    // 使用 @InjectRepository() 装饰器将 UsersRepository（用于操作 User 表的工具）注入到 UsersService 中
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
+
+  // 查询所有数据
+  findAll() {
+    return this.userRepository.find();
   }
 
-  // todo: 新增用户数据
-  addUser() {
-    return {
-      code: 200,
-      msg: '新增用户数据成功',
-      data: {},
-    };
+  // 根据条件进行查询
+  find(username: string) {
+    return this.userRepository.findOne({ where: { username } });
+  }
+
+  // 创建新的 User 数据
+  create(user: User) {
+    const userTemp = this.userRepository.create(user);
+    return this.userRepository.save(userTemp);
+  }
+
+  // 更新用户时只需要提供要修改的字段, Partial<User> 表示 User 对象的部分属性，即所有属性都变成可选的。
+  update(id: number, user: Partial<User>) {
+    // update 方法需要传递查询的参数，以及更新后的 User 类型的对象
+    return this.userRepository.update(id, user);
+  }
+
+  // 删除某个 User 数据
+  remove(id: number) {
+    return this.userRepository.delete(id);
   }
 }
