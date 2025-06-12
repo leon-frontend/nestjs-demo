@@ -11,6 +11,7 @@ import { User } from './user/user.entity';
 import { Profile } from './user/profile.entity';
 import { Logs } from './logs/logs.entity';
 import { Roles } from './roles/roles.entity';
+import { LogsModule } from './logs/logs.module';
 
 // 根据 NODE_ENV 读取开发环境或生产环境的 .env 文件。其中，NODE_ENV 由 cross-env 库在 package.json 文件中设置。
 const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
@@ -64,14 +65,15 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
           password: configService.get<string>(configEnum.DB_PASSWORD),
           database: configService.get<string>(configEnum.DB_DATABASE), // 指定要连接的数据库名称，mysql 中必须需要有这个数据库
           entities: [User, Profile, Logs, Roles], // 实体类，对应数据库表
-          synchronize:
-            configService.get<string>(configEnum.DB_SYNC) === 'development', // 同步本地实体与数据库中的表结构，一般会在初始化时使用。注意，仅在开发环境使用。
-          logging: ['error'],
+          synchronize: process.env.NODE_ENV === 'development', // 同步本地实体与数据库中的表结构，一般会在初始化时使用。注意，仅在开发环境使用。
+          // logging: ['error'],
+          logging: process.env.NODE_ENV === 'development', // 打印所有的 SQL 语句，一般只在开发环境下使用
         };
       },
     }),
     UserModule,
     RangeModule,
+    LogsModule,
   ],
   controllers: [],
   providers: [],

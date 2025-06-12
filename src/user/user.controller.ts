@@ -32,4 +32,14 @@ export class UserController {
     };
     return this.userService.create(user);
   }
+
+  @Get('/profile') // 实现 User 表和 Profile 表的一对一关联查询
+  getProfile(): any {
+    return this.userService.findProfile(2);
+  }
+
+  @Get('/logs') // 实现 User 表和 Logs 表的一对多关联查询
+  getUserLogs(): any {
+    return this.userService.findUserLogs(2);
+  }
 }

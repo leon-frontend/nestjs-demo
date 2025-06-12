@@ -37,4 +37,20 @@ export class UserService {
   remove(id: number) {
     return this.userRepository.delete(id);
   }
+
+  // todo: 实现一对一的关联查询
+  findProfile(userId: number) {
+    return this.userRepository.findOne({
+      where: { id: userId },
+      relations: { profile: true }, // 开启关联查询
+    });
+  }
+
+  // todo: 实现一对多的关联查询，查询某个用户拥有的所有日志信息
+  findUserLogs(userId: number) {
+    return this.userRepository.findOne({
+      where: { id: userId },
+      relations: { logs: true }, // 开启关联查询
+    });
+  }
 }

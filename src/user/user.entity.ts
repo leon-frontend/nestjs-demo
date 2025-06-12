@@ -7,8 +7,10 @@ import {
   JoinTable,
   ManyToMany,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Profile } from './profile.entity';
 
 @Entity()
 export class User {
@@ -20,6 +22,10 @@ export class User {
 
   @Column() // 列
   password: string;
+
+  // 一对一关系：一个用户拥有一个个人资料
+  @OneToOne(() => Profile, (profile) => profile.user)
+  profile?: Profile;
 
   // 一对多关系：一个用户拥有多个日志，会在"被拥有"的表中创建外键字段。
   // 第二个参数解析：表示从 A 实体如何找到 B 实体中对应的关联属性。当我从 User 查找关联的 Logs 时，通过 Logs 实体中的 user 属性来建立反向连接

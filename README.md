@@ -208,14 +208,15 @@ TypeOrmModule.forRootAsync({
       database: configService.get<string>(configEnum.DB_DATABASE), // 指定要连接的数据库名称，在 mysql 中必须存在。
       entities: [User, Profile, Logs, Roles], // 实体类，对应数据库表
       // 同步本地实体与数据库中的表结构，一般会在初始化时使用。注意，仅在开发环境使用。
-      synchronize: configService.get<string>(configEnum.DB_SYNC) === 'development', 
-      logging: ['error'],
+      synchronize: process.env.NODE_ENV === 'development', 
+      // logging: ['error'],
+      logging: process.env.NODE_ENV === 'development', // 打印所有的 SQL 语句，一般只在开发环境下使用
     };
   },
 }),
 ```
 
-## 3.4 实体类 -> 数据库表
+## 3.4 实体类 -> 创建数据库表
 
 - **Reference**: [TypeORM 中文文档 - 关联关系](https://typeorm.bootcss.com/relations)
 
@@ -226,21 +227,21 @@ TypeOrmModule.forRootAsync({
 - **外键字段存放位置**：一个 User 拥有一个 Profile，外键字段存放于**”被拥有“**的表中。
 
 ```ts
-// todo: 通过设计实体类来设计数据库表 - 创建一对一的关联关系
+// --------------------- todo: Profile 表设置一对一的关联关系（设置外键） ---------------------
 @Entity()
 export class Profile {
-  @PrimaryGeneratedColumn() // 主键（自增列）
-  id: number;
-
-  @Column()
-  gender: number;
-
+  ... ...
   // 建立一对一依赖关系
   @OneToOne(() => User) // 返回依赖的实体类（数据表）。返回函数形式可以避免循环依赖问题，延迟加载实体类型
   @JoinColumn() // 创建关联字段（外键字段）。默认通过 userId 字段名关联 user 表。
   // @JoinColumn({ name: 'uid' }) // 可以使用 name 属性自定义关联字段名称。
   user: User; // 通过 user 属性可以访问关联的 User 对象的所有数据
 }
+
+// --------------------- todo: User 表设置一对一的关联关系（设置外键） ---------------------
+// 一对一关系：一个用户拥有一个个人资料
+@OneToOne(() => Profile, (profile) => profile.user)
+profile: Profile;
 ```
 
 ### 3.4.2 一对多 & 多对一
@@ -291,7 +292,7 @@ export class Roles {
 }
 ```
 
-## 3.5 数据库表 -> 实体类
+## 3.5 数据库表 -> 创建实体类
 
 - **Reference**: [使用 typeorm-model-generator 库](https://www.npmjs.com/package/typeorm-model-generator)   |   [B 站视频](https://www.bilibili.com/video/BV14fDGYUEip?spm_id_from=333.788.videopod.episodes&vd_source=53fdd342b8b1677425cdb446eb231b76&p=54)
 
@@ -299,7 +300,9 @@ export class Roles {
 pnpm i -D typeorm-model-generator // 仅安装开发依赖
 ```
 
-## 3.6 数据库的 CURD
+# 04. NestJs 实现 CURD
+
+## 4.1 基本的 CURD 操作
 
 ```ts
 // --------------------- todo: 在 user.module.ts 文件中将实体注册到当前模块 ---------------------
@@ -333,6 +336,50 @@ export class UserService {
   // 更新用户时只需要提供要修改的字段, Partial<User> 表示 User 对象的部分属性，即所有属性都变成可选的。
   // update 方法需要传递查询的参数，以及更新后的 User 类型的对象
   update(id: number, user: Partial<User>) { return this.userRepository.update(id, user); }
+    
+  // todo: 实现一对一的关联查询
+  findProfile(userId: number) {
+    return this.userRepository.findOne({
+      where: { id: userId },
+      relations: { profile: true }, // 开启关联查询
+    });
+  }
+
+  // todo: 实现一对多的关联查询，查询某个用户拥有的所有日志信息
+  findUserLogs(userId: number) {
+    return this.userRepository.findOne({
+      where: { id: userId },
+      relations: { logs: true }, // 开启关联查询
+    });
+  }
+}
+```
+
+## 4.2 Query Builder & 复杂查询
+
+```ts
+// todo: 使用 Query Builder 查询 userId 为 2 的用户拥有的 logs 信息的 result 数据和相同的 result 出现的次数
+findLogsByGoup(userId: number) {
+  /*
+  SQL: 
+  	SELECT logs.result as result, COUNT(logs.result) as count
+  	from logs
+  	LEFT JOIN user ON user.id = logs.userId
+  	WHERE user.id = 2 
+  	GROUP BY logs.result
+  */
+  return (
+    this.logsRepository
+      .createQueryBuilder('logs') // 'logs' 是为主表(Logs 表)设置的别名
+      .select('logs.result', 'result') // 选择 logs 表的 result 字段
+      .addSelect('COUNT(logs.result)', 'count') // 第二参数是字段别名
+      // 左连接 user 表，并选择 user 表的所有字段。'user' 是连接表的别名。注意，AndSelect 后缀会选择 user 表的所有字段
+      .leftJoinAndSelect('logs.user', 'user')
+      .where('user.id = :id', { id: userId })
+      .groupBy('logs.result')
+      .orderBy('result', 'DESC')
+      .getRawMany()
+  );
 }
 ```
 
