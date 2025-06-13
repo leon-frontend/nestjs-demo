@@ -40,6 +40,9 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
   ],
   ... ...
 })
+      
+// 获取环境变量
+console.log('DB: ', this.configService.get(configEnum.DB)); // 获取配置文件中的环境变量
 ```
 
 - `ConfigModule.forRoot({ load：[xxx] })`：load 配置项可以用于加载自定义的配置文件。`.env` 文件在处理多层级的环境变量时会出现**变量名过长**的问题，比如 `db_mysql_port=xxx`。因此，可以使用 load 配置项读取 `yaml` 自定义文件，该类型文件主要处理**多层嵌套的环境变量**。
@@ -380,6 +383,123 @@ findLogsByGoup(userId: number) {
       .orderBy('result', 'DESC')
       .getRawMany()
   );
+}
+```
+
+# 05. 日志
+
+| **日志等级** | **理解**                                         |
+| ------------ | ------------------------------------------------ |
+| Log          | 通用日志，按需进行记录（打印）。                 |
+| Warning      | 警告日志，比如：尝试多次进行数据库操作。         |
+| Error        | 严重日志，比如：数据库异常。                     |
+| Debug        | 调试日志，比如：加载数据日志。                   |
+| Verbose      | 详细日志，所有的操作与详细信息（非必要不打印）。 |
+
+| **日志分类** | **理解**                         |
+| ------------ | -------------------------------- |
+| 错误日志     | 方便定位问题，给用户友好的提示。 |
+| 调试日志     | 方便开发。                       |
+| 请求日志     | 记录敏感行为。                   |
+
+|          |   Log   |  Warning  |     Error      |     Debug      | Verbose |     API      |
+| :------: | :-----: | :-------: | :------------: | :------------: | :-----: | :----------: |
+| **Dev**  |    √    |     √     |       √        |       √        |    √    |      ×       |
+| **Test** |    √    |     √     |       √        |       ×        |    ×    |      ×       |
+| **Prod** |    √    |     √     |       ×        |       ×        |    ×    |      √       |
+| **位置** | console | File / DB | console / File | console / File | console | console / DB |
+
+## 5.1 NestJs 内置日志模块
+
+```ts
+// -------------------------- 在 main.ts 文件中全局使用 --------------------------
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, {
+    logger: false, // 关闭整个 NestJs 的日志
+    logger: ['error', 'warn'], // 指定需要打印的日志等级
+  });
+  await app.listen(process.env.PORT ?? 3000);
+  // 创建日志实例，并输出 warn 等级的日志
+  const logger = new Logger(); // 创建一个日志实例
+  logger.log(`Application is running on: 3000 --- log level`); // 绿色
+  logger.warn(`Application is running on: 3000 --- warn level`); // 橙色
+}
+
+// ------------------- 在 user.controller.ts 文件中进行局部使用 -------------------
+@Controller('user')
+export class UserController {
+  // 实例化日志对象(不要使用依赖注入)，参数为当前 controller 的名称，用于区别日志
+  private userLogger = new Logger(UserController.name);
+  constructor(... ...) {    
+    this.userLogger.log('user.controller: Init'); // 测试 userLogger
+  }
+
+  @Get()
+  getUsers(): any {
+    this.userLogger.log('请求 getUsers 成功'); // 测试 userLogger
+    ... ...
+  }
+}
+```
+
+## 5.2 第三方日志模块
+
+- [Github - Pino 日志模块](https://github.com/pinojs/pino/blob/main/docs/web.md#nest)   |   [npm - Pino 日志模块](https://www.npmjs.com/package/nestjs-pino)   |   [Bilibili - Pino 日志模块](https://www.bilibili.com/video/BV14fDGYUEip?spm_id_from=333.788.player.switch&vd_source=53fdd342b8b1677425cdb446eb231b76&p=61)
+- Winston 日志
+
+# 06. 异常过滤器
+
+- **Reference**: [NestJs 中文网 - 异常过滤器](https://nest.nodejs.cn/exception-filters)   |   [NestJs 中文网 - 内置 HTTP 异常](https://docs.nestjs.cn/11/exceptionfilters?id=%e5%86%85%e7%bd%aehttp%e5%bc%82%e5%b8%b8)
+
+- **理解**：Nest 带有一个内置的异常层，负责处理应用中所有未处理的异常。当你的应用代码未处理异常时，该层会捕获该异常，然后自动发送适当的用户友好响应。
+
+```ts
+// --------------------------- user.controller.ts 文件 ------------------------------
+if (!isAdmin) throw new HttpException('用户禁止访问', HttpStatus.FORBIDDEN); // 403
+if (!isAdmin) throw new HttpException('用户不存在', HttpStatus.NOT_FOUND); // 自动设置状态码 404
+if (!isAdmin) throw new UnauthorizedException('用户没有权限'); // 自动设置状态码 401
+```
+
+## 6.1 捕获全局异常
+
+- **Filter 文件**：可以通过 Nest CLI 工具创建 filter 类型的文件。
+- **注意**：全局的异常过滤器**只能有一个**。
+
+```ts
+
+// ----------------------------- main.ts 文件 ------------------------------
+... ...
+const logger = new Logger(); // 创建一个日志实例
+// 全局注册过滤器，结合错误日志使用。注意，全局过滤器只能有一个。
+app.useGlobalFilters(new HttpExceptionFilter(logger));
+await app.listen(process.env.PORT ?? 3000);
+
+// ------------ src/filters/http-exception.filter.ts 文件：定义全局的异常过滤器 --------------
+import type { Request, Response } from 'express';
+
+@Catch(HttpException) // 指定这个过滤器只捕获 HttpException 类型的异常
+export class HttpExceptionFilter implements ExceptionFilter {
+  constructor(private logger: Logger) {} // 异常处理结合日志，会在控制台输出异常
+
+  // 实现 ExceptionFilter 接口中的 catch 方法。
+  // ArgumentsHost: 提供对当前执行上下文的访问，可以获取 Request、Response 对象。
+  catch(exception: HttpException, host: ArgumentsHost) {
+    const ctx = host.switchToHttp(); // 获取上下文对象
+    const request = ctx.getRequest<Request>(); // 获取请求对象
+    const response = ctx.getResponse<Response>(); // 获取响应对象
+    const status = exception.getStatus(); // 获取状态码
+    this.logger.error(exception.message, exception.stack); // 错误日志
+
+    // 定义响应数据
+    response.status(status).json({
+      statusCode: status,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      method: request.method,
+      // NotFoundException('用户不存在') 中的参数会作为 message 的值
+      message: exception.message || HttpException.name, 
+    });
+  }
 }
 ```
 
