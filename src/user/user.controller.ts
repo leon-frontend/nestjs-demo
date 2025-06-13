@@ -6,7 +6,7 @@ import {
   Logger,
   // NotFoundException,
   Post,
-  UnauthorizedException,
+  // UnauthorizedException,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from './user.entity';
@@ -38,9 +38,10 @@ export class UserController {
     const isAdmin = false;
     // if (!isAdmin) throw new HttpException('用户禁止访问', HttpStatus.FORBIDDEN); // 403
     // if (!isAdmin) throw new NotFoundException('用户不存在'); // 自动设置状态码 404
-    if (!isAdmin) throw new UnauthorizedException('用户没有权限'); // 自动设置状态码 401
+    if (!isAdmin)
+      // throw new UnauthorizedException('user.controller.ts 文件: 用户没有权限'); // 自动设置状态码 401
 
-    this.userLogger.log('请求 getUsers 成功'); // 测试 userLogger
+      this.userLogger.log('请求 getUsers 成功'); // 测试 userLogger
     return this.userService.findAll();
   }
 

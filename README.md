@@ -182,6 +182,8 @@ docker-compose up -d # -d 表示在后台运行
 
 ## 3.3 连接数据库
 
+- **ormconfig.ts 文件**：该文件中提取了核心配置文件，所有数据库相关的配置都在这里管理。该文件支持 TypeORM CLI 和统一管理，在迁移数据库的过程中发挥重要作用。
+
 ``` ts
 // 1. 数据写死配置方式 - forRoot 方法
 TypeOrmModule.forRoot({

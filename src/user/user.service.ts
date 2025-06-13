@@ -12,7 +12,7 @@ export class UserService {
   ) {}
 
   // 查询所有数据
-  findAll() {
+  findAll(): Promise<User[]> {
     return this.userRepository.find();
   }
 

@@ -22,9 +22,9 @@ async function bootstrap() {
   // logger.warn(`Application is running on: 3000 --- warn level`); // 橙色
 
   // 使用 webpack 实现热重载
-  if (module.hot) {
-    module.hot.accept();
-    module.hot.dispose(() => void app.close());
-  }
+  // if (module.hot) {
+  //   module.hot.accept();
+  //   module.hot.dispose(() => void app.close());
+  // }
 }
 bootstrap().catch(console.error);
