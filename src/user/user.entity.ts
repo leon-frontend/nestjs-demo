@@ -17,7 +17,7 @@ export class User {
   @PrimaryGeneratedColumn() // 主键（自增列）
   id?: number;
 
-  @Column() // 列
+  @Column({ unique: true }) // 列，唯一索引
   username: string;
 
   @Column() // 列

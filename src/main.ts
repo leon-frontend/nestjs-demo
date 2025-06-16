@@ -9,7 +9,8 @@ async function bootstrap() {
     // logger: ['error', 'warn'], // 指定需要打印的日志等级
   });
 
-  app.setGlobalPrefix('api/v1'); //  添加全局前缀
+  // 添加全局前缀
+  app.setGlobalPrefix('api/v1');
 
   // 全局注册过滤器，配合错误日志使用
   const logger = new Logger(); // 创建一个日志实例

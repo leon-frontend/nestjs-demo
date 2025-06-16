@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './user.entity';
 import { Repository } from 'typeorm';
+import type { GetUserDto } from './dto/get-user.dto';
 
 @Injectable()
 export class UserService {
@@ -12,8 +13,41 @@ export class UserService {
   ) {}
 
   // 查询所有数据
-  findAll(): Promise<User[]> {
-    return this.userRepository.find();
+  findAll(query: GetUserDto): Promise<User[]> {
+    // 解构 Query 参数，并设置默认值
+    const { limit = 10, page = 1, roleId, gender, username } = query;
+
+    /*
+      原生 SQL 语句:
+        SELECT * FROM user u 
+        LEFT JOIN profile p ON u.id = p.uid
+        LEFT JOIN roles r ON u.id = r.uid
+        WHERE ...
+        LIMIT ...
+        OFFSET ...
+    */
+    return this.userRepository.find({
+      // 字段筛选：select 属性表示需要查询哪些字段
+      select: {
+        id: true,
+        username: true,
+        profile: {
+          gender: true, // profile 表只展示 gender 字段
+        },
+      },
+      relations: ['profile', 'roles'],
+      take: limit, // take 属性对应 SQL 中的 LIMIT
+      skip: (page - 1) * limit, // skip 属性对应 SQL 中的 OFFSET
+      where: {
+        profile: {
+          gender,
+        },
+        roles: {
+          id: roleId,
+        },
+        username,
+      },
+    });
   }
 
   // 根据条件进行查询
@@ -22,9 +56,10 @@ export class UserService {
   }
 
   // 创建新的 User 数据
-  create(user: User) {
+  async create(user: User) {
     const userTemp = this.userRepository.create(user);
-    return this.userRepository.save(userTemp);
+    const res = await this.userRepository.save(userTemp);
+    return res;
   }
 
   // 更新用户时只需要提供要修改的字段, Partial<User> 表示 User 对象的部分属性，即所有属性都变成可选的。

@@ -388,6 +388,38 @@ findLogsByGoup(userId: number) {
 }
 ```
 
+## 4.3 Find() 方法 & 复杂查询
+
+```ts
+// -----------------  todo 根据 Query 参数查询用户数据(user.service.ts 文件) --------------------
+findAll(query: GetUserDto): Promise<User[]> {    
+    const { limit = 10, page = 1, roleId, gender, username } = query; // 解构 Query 参数，并设置默认值
+
+    /*
+      原生 SQL 语句:
+        SELECT * FROM user u LEFT JOIN profile p ON u.id = p.uid LEFT JOIN roles r ON u.id = r.uid
+        WHERE ...
+        LIMIT ...
+        OFFSET ...
+    */
+    return this.userRepository.find({      
+      select: { // 字段筛选：select 属性表示需要查询哪些字段
+        id: true,
+        username: true,
+        profile: { gender: true }, // profile 表只展示 gender 字段
+      },
+      relations: ['profile', 'roles'],
+      take: limit, // take 属性对应 SQL 中的 LIMIT
+      skip: (page - 1) * limit, // skip 属性对应 SQL 中的 OFFSET
+      where: {
+        profile: { gender },
+        roles: { id: roleId },
+        username,
+      },
+    });
+}
+```
+
 # 05. 日志
 
 | **日志等级** | **理解**                                         |
@@ -504,4 +536,46 @@ export class HttpExceptionFilter implements ExceptionFilter {
   }
 }
 ```
+
+## 6.2 捕获局部异常 & TypeORM 异常
+
+```ts
+// -------------------- typeorm.filter.ts 文件: 专门处理 TypeORM 异常 ---------------------
+import type { Response } from 'express';
+
+// todo 统一处理 TypeORM 错误，在 Controller 中使用
+@Catch(TypeORMError)
+export class TypeormFilter implements ExceptionFilter {
+  // ArgumentsHost: 提供对当前执行上下文的访问，可以获取 Request、Response 对象。
+  catch(exception: TypeORMError, host: ArgumentsHost) {
+    const ctx = host.switchToHttp(); // 获取上下文对象
+    const response = ctx.getResponse<Response>(); // 获取响应对象
+    let errorCode = 500; // 默认为服务器错误，和 HTTP 响应码不是一个概念
+
+    // 检查异常是否为查询失败错误
+    if (exception instanceof QueryFailedError) {
+      // QueryFailedError 包含一个 driverError 属性，它包含了数据库驱动返回的原始错误
+      errorCode = (exception.driverError as { errno: number }).errno;
+    }
+
+    // 定义响应数据，status 中的值是 HTTP 响应码
+    response.status(500).json({
+      errorCode, // 这个 code 是自定义设置的，和 HTTP 响应码不是一个概念
+      timestamp: new Date().toISOString(),
+      errorMsg: exception.message,
+    });
+  }
+}
+
+// -------------------- user.controller.ts 文件中进行局部使用 ---------------------
+@Controller('user')
+@UseFilters(new TypeormFilter()) // 使用 TypeormFilter 过滤器处理异常
+export class UserController {... ...}
+```
+
+# 07. 动态路由传参 & 查询数据
+
+- **注意 1**：前端传递的 Query 参数中的所有类型都为 **String** 类型。
+
+
 
