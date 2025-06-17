@@ -305,9 +305,11 @@ export class Roles {
 pnpm i -D typeorm-model-generator // 仅安装开发依赖
 ```
 
-# 04. NestJs 实现 CURD
+## 3.6 实体监听器和订阅者
 
-## 4.1 基本的 CURD 操作
+- **Reference**：[TypeORM 中文文档 - 实体监听器和订阅者](https://typeorm.bootcss.com/listeners-and-subscribers)
+
+# 04. NestJs 实现 CURD
 
 ```ts
 // --------------------- todo: 在 user.module.ts 文件中将实体注册到当前模块 ---------------------
@@ -323,44 +325,97 @@ export class UserModule {}
 @Injectable()
 export class UserService {
   constructor(
-    // 使用 @InjectRepository() 装饰器将 UsersRepository（用于操作 User 表的工具）注入到 UsersService 中
-    @InjectRepository(User)
+    @InjectRepository(User) // 使用装饰器将 UsersRepository（用于操作 User 表的工具）注入到 Service 中
     private readonly userRepository: Repository<User>,
   ) {}
 
-  findAll() { return this.userRepository.find(); }   // 查询所有数据
-  find(username: string) { return this.userRepository.findOne({ where: { username } }); } // 根据条件进行查询
-  remove(id: number) { return this.userRepository.delete(id); } // 删除某个 User 数据
-    
-  // 创建新的 User 数据
-  create(user: User) {
-    const userTemp = this.userRepository.create(user);
-    return this.userRepository.save(userTemp);
-  }
-    
-  // 更新用户时只需要提供要修改的字段, Partial<User> 表示 User 对象的部分属性，即所有属性都变成可选的。
-  // update 方法需要传递查询的参数，以及更新后的 User 类型的对象
-  update(id: number, user: Partial<User>) { return this.userRepository.update(id, user); }
-    
-  // todo: 实现一对一的关联查询
-  findProfile(userId: number) {
-    return this.userRepository.findOne({
-      where: { id: userId },
-      relations: { profile: true }, // 开启关联查询
-    });
-  }
-
-  // todo: 实现一对多的关联查询，查询某个用户拥有的所有日志信息
-  findUserLogs(userId: number) {
-    return this.userRepository.findOne({
-      where: { id: userId },
-      relations: { logs: true }, // 开启关联查询
-    });
-  }
+  create(user: User) { xxx } // 创建新的 User 数据  
+  ... ...
 }
 ```
 
-## 4.2 Query Builder & 复杂查询
+## 4.1 新增功能
+
+```ts
+// 创建新的 User 数据
+create(user: User) {
+  const userTemp = this.userRepository.create(user);
+  return this.userRepository.save(userTemp);
+}
+```
+
+## 4.2 删除功能
+
+- **remove 方法**：可以一次性删除单个或者多个实例，并且可以**触发 BeforeRemove, AfterRemove 钩子函数**。
+- **delete 方法**：它会直接在数据库中执行 `DELETE` 语句，不会加载实体。一般用于**根据某个数据**(比如 id )一次性删除单个或者多个 id 实例，但是不会触发钩子函数。
+
+```ts
+// 1. 使用 delete 方法删除某个 User 数据
+remove(id: number) { return this.userRepository.delete(id); }
+
+// 2. 使用 remove 方法删除某个 User 数据
+async remove(id: number) {
+  const user = await this.userRepository.findOne({ where: { id } });
+  // 检查 user 是否存在。如果用户不存在，抛出一个标准的“未找到”异常。http-exception 会对其捕获
+  if (!user) { throw new NotFoundException(`ID 为 "${id}" 的用户未找到。`); 
+  return this.userRepository.remove(user);
+}
+```
+
+## 4.3 更新功能
+
+- **级联属性 & 关联模型更新**：Repository 中的 update 方法**只适合更新单模型中的数据**，无法更新其关联模型中的数据。若想要更新关联模型中的数据，则必须在实体中**声明关联关系**时设置 `{ cascade: true }`，然后先查询出关联数据，再使用 save 方法进行数据更新。
+
+```ts
+// ------- 使用 Repository 的 update 方法只能更新单个 User 模型中的数据 -------
+update(id: number, user: Partial<User>) { return this.userRepository.update(id, user); }
+
+// --------------- 更新 User 模型中的 Profile 模型（关联模型）中的数据 ----------------
+@Entity()
+export class User {
+  @OneToOne(() => Profile, (profile) => profile.user, { cascade: true }) // cascade 表示级联保存、更新、删除操作。
+  profile?: Profile;
+}
+
+async update(id: number, user: Partial<User>) {
+  // 更新 User 模型中的 Profile 模型（关联模型）中的数据
+  const userTemp = await this.findProfile(id); // 查询用户的 Profile 信息
+  if (!userTemp) throw new NotFoundException('用户不存在');
+  const newUser = this.userRepository.merge(userTemp, user); // 合并两个对象
+  return this.userRepository.save(newUser); // 使用 save 方法更新数据
+}
+
+// 注意，请求体的数据格式如下
+{
+    "username": "test222",
+    "profile": { xxx }
+}
+```
+
+## 4.4 查询功能
+
+```ts
+findAll() { return this.userRepository.find(); }  // 查询所有数据
+find(username: string) { return this.userRepository.findOne({ where: { username } }); } // 根据条件进行查询
+
+// todo: 实现一对一的关联查询
+findProfile(userId: number) {
+  return this.userRepository.findOne({
+    where: { id: userId },
+    relations: { profile: true }, // 开启关联查询
+  });
+}
+
+// todo: 实现一对多的关联查询，查询某个用户拥有的所有日志信息
+findUserLogs(userId: number) {
+  return this.userRepository.findOne({
+    where: { id: userId },
+    relations: { logs: true }, // 开启关联查询
+  });
+}
+```
+
+## 4.5 Query Builder & 复杂查询
 
 ```ts
 // todo: 使用 Query Builder 查询 userId 为 2 的用户拥有的 logs 信息的 result 数据和相同的 result 出现的次数
@@ -370,7 +425,7 @@ findLogsByGoup(userId: number) {
   	SELECT logs.result as result, COUNT(logs.result) as count
   	from logs
   	LEFT JOIN user ON user.id = logs.userId
-  	WHERE user.id = 2 
+  	WHERE user.id = 2
   	GROUP BY logs.result
   */
   return (
@@ -388,7 +443,7 @@ findLogsByGoup(userId: number) {
 }
 ```
 
-## 4.3 Find() 方法 & 复杂查询
+## 4.6 Find() 方法 & 复杂查询
 
 ```ts
 // -----------------  todo 根据 Query 参数查询用户数据(user.service.ts 文件) --------------------
@@ -573,7 +628,7 @@ export class TypeormFilter implements ExceptionFilter {
 export class UserController {... ...}
 ```
 
-# 07. 动态路由传参 & 查询数据
+# 07. 动态路由传参
 
 - **注意 1**：前端传递的 Query 参数中的所有类型都为 **String** 类型。
 

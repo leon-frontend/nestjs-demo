@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './user.entity';
 import { Repository } from 'typeorm';
@@ -56,21 +56,35 @@ export class UserService {
   }
 
   // 创建新的 User 数据
-  async create(user: User) {
+  create(user: User) {
     const userTemp = this.userRepository.create(user);
-    const res = await this.userRepository.save(userTemp);
-    return res;
+    return this.userRepository.save(userTemp);
   }
 
   // 更新用户时只需要提供要修改的字段, Partial<User> 表示 User 对象的部分属性，即所有属性都变成可选的。
-  update(id: number, user: Partial<User>) {
-    // update 方法需要传递查询的参数，以及更新后的 User 类型的对象
-    return this.userRepository.update(id, user);
+  async update(id: number, user: Partial<User>) {
+    // 使用 Repository 的 update 方法只能更新单个 User 模型中的数据
+    // return this.userRepository.update(id, user);
+
+    // 更新 User 模型中的 Profile 模型（关联模型）中的数据
+    const userTemp = await this.findProfile(id); // 查询用户的 Profile 信息
+    if (!userTemp) throw new NotFoundException('用户不存在');
+    const newUser = this.userRepository.merge(userTemp, user); // 合并两个对象
+    return this.userRepository.save(newUser); // 使用 save 方法更新数据
   }
 
   // 删除某个 User 数据
-  remove(id: number) {
-    return this.userRepository.delete(id);
+  async remove(id: number) {
+    // return this.userRepository.delete(id); // 根据 id 数据删除数据
+    const user = await this.userRepository.findOne({ where: { id } });
+
+    // 检查 user 是否存在
+    if (!user) {
+      // 如果用户不存在，抛出一个标准的“未找到”异常。http-exception 会对其捕获
+      throw new NotFoundException(`ID 为 "${id}" 的用户未找到。`);
+    }
+
+    return this.userRepository.remove(user);
   }
 
   // todo: 实现一对一的关联查询

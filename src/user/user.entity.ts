@@ -2,6 +2,8 @@
 import { Logs } from 'src/logs/logs.entity';
 import { Roles } from 'src/roles/roles.entity';
 import {
+  AfterInsert,
+  AfterRemove,
   Column,
   Entity,
   JoinTable,
@@ -23,8 +25,8 @@ export class User {
   @Column() // 列
   password: string;
 
-  // 一对一关系：一个用户拥有一个个人资料
-  @OneToOne(() => Profile, (profile) => profile.user)
+  // 一对一关系：一个用户拥有一个个人资料。cascade 属性表示级联保存、更新、删除操作。
+  @OneToOne(() => Profile, (profile) => profile.user, { cascade: true })
   profile?: Profile;
 
   // 一对多关系：一个用户拥有多个日志，会在"被拥有"的表中创建外键字段。
@@ -36,4 +38,14 @@ export class User {
   @ManyToMany(() => Roles, (roles) => roles.users)
   @JoinTable({ name: 'users_roles' }) // 建立多对多关联的中间表，命名为 user_roles
   roles: Roles[];
+
+  @AfterInsert() // 该钩子函数会在插入数据后执行
+  afterInsert() {
+    console.log('🚀 ~ User ~ afterInsert ~ afterInsert');
+  }
+
+  @AfterRemove() // 该钩子函数会在删除数据后执行
+  afterRemove() {
+    console.log('🚀 ~ User ~ afterRemove ~ afterRemove');
+  }
 }

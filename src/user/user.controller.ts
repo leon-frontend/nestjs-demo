@@ -3,11 +3,13 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Logger,
   Param,
   Patch,
   Post,
   Query,
+  UnauthorizedException,
   UseFilters,
   // NotFoundException,
   // HttpException,
@@ -84,15 +86,30 @@ export class UserController {
     return 'hello world';
   }
 
-  @Patch('/:id')
-  updateUser(@Param('id') id: number, @Body() dto: any): any {
-    // @Body 装饰器用于提取请求体中的数据；@Param 装饰器用于提取路由中的动态参数
-    const user = dto as User;
-    return this.userService.update(id, user);
+  @Patch('/:id') // 更新某个用户
+  updateUser(
+    @Param('id') id: number,
+    @Body() dto: any,
+    @Headers('Authorization') auth: any, // 获取请求头中的 Authorization
+  ): any {
+    // console.log('🚀 ~ UserController ~ auth:', auth);
+    // 权限1：用户只能更新自己的信息，因此判断用户是否是自己
+    // 如果需要修改的用户数据的 id 和发出该请求的用户 id 一致，则允许修改
+    if (id === auth) {
+      // @Body 装饰器用于提取请求体中的数据；@Param 装饰器用于提取路由中的动态参数
+      const user = dto as User;
+
+      // 权限2：判断用户是否有更新权限
+
+      // 返回的数据不能包含敏感的 password 等信息
+      return this.userService.update(id, user);
+    } else {
+      throw new UnauthorizedException('用户没有更新权限');
+    }
   }
 
-  @Delete('/:id')
-  deleteUser(@Param('id') id: number): any {
+  @Delete('/:id') // 删除某个用户
+  removeUser(@Param('id') id: number): any {
     return this.userService.remove(id);
   }
 }
