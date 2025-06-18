@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './user.entity';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { Roles } from '../roles/roles.entity';
 import type { GetUserDto } from './dto/get-user.dto';
 
 @Injectable()
@@ -10,6 +11,8 @@ export class UserService {
     // 使用 @InjectRepository() 装饰器将 UsersRepository（用于操作 User 表的工具）注入到 UsersService 中
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Roles)
+    private readonly rolesRepository: Repository<Roles>,
   ) {}
 
   // 查询所有数据
@@ -31,9 +34,9 @@ export class UserService {
       select: {
         id: true,
         username: true,
-        profile: {
-          gender: true, // profile 表只展示 gender 字段
-        },
+        // profile: {
+        //   gender: true, // profile 表只展示 gender 字段
+        // },
       },
       relations: ['profile', 'roles'],
       take: limit, // take 属性对应 SQL 中的 LIMIT
@@ -56,7 +59,14 @@ export class UserService {
   }
 
   // 创建新的 User 数据
-  create(user: User) {
+  async create(user: User) {
+    // 由于前端传递的数据是 roleId，因此需要先查询出对应的 role name
+    if (user.roles instanceof Array) {
+      user.roles = await this.rolesRepository.find({
+        where: { id: In(user.roles) },
+      });
+    }
+
     const userTemp = this.userRepository.create(user);
     return this.userRepository.save(userTemp);
   }

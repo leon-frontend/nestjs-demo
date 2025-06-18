@@ -26,7 +26,7 @@ export class User {
   password: string;
 
   // 一对一关系：一个用户拥有一个个人资料。cascade 属性表示级联保存、更新、删除操作。
-  @OneToOne(() => Profile, (profile) => profile.user, { cascade: true })
+  @OneToOne(() => Profile, (profile) => profile.user, { cascade: ['insert'] })
   profile?: Profile;
 
   // 一对多关系：一个用户拥有多个日志，会在"被拥有"的表中创建外键字段。
@@ -35,7 +35,7 @@ export class User {
   logs: Logs[]; // 数组类型，表示多个日志
 
   // 多对多关系：一个用户拥有多个角色，一个角色对应多个用户
-  @ManyToMany(() => Roles, (roles) => roles.users)
+  @ManyToMany(() => Roles, (roles) => roles.users, { cascade: ['insert'] })
   @JoinTable({ name: 'users_roles' }) // 建立多对多关联的中间表，命名为 user_roles
   roles: Roles[];
 
